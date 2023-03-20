@@ -19,3 +19,93 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+# Importing the libraries
+import nltk
+import tensorflow as tf
+import numpy as np
+
+# Downloading the data
+nltk.download('punkt')
+nltk.download('wordnet')
+
+# Loading the data
+with open('data/questions.txt', 'r') as f:
+  questions = f.readlines()
+with open('data/answers.txt', 'r') as f:
+  answers = f.readlines()
+
+# Preprocessing the data
+questions = [q.strip().lower() for q in questions]
+answers = [a.strip().lower() for a in answers]
+
+# Creating a tokenizer
+tokenizer = tf.keras.preprocessing.text.Tokenizer(filters='')
+tokenizer.fit_on_texts(questions + answers)
+
+# Converting text to sequences
+questions_seq = tokenizer.texts_to_sequences(questions)
+answers_seq = tokenizer.texts_to_sequences(answers)
+
+# Padding the sequences
+max_len_q = max([len(q) for q in questions_seq])
+max_len_a = max([len(a) for a in answers_seq])
+questions_seq = tf.keras.preprocessing.sequence.pad_sequences(questions_seq, maxlen=max_len_q, padding='post')
+answers_seq = tf.keras.preprocessing.sequence.pad_sequences(answers_seq, maxlen=max_len_a, padding='post')
+
+# Creating a vocabulary
+vocab_size = len(tokenizer.word_index) + 1
+
+# Creating an encoder-decoder model
+encoder_inputs = tf.keras.layers.Input(shape=(None,))
+encoder_embedding = tf.keras.layers.Embedding(vocab_size, 256)(encoder_inputs)
+encoder_lstm = tf.keras.layers.LSTM(512, return_state=True)
+encoder_outputs, state_h, state_c = encoder_lstm(encoder_embedding)
+encoder_states = [state_h, state_c]
+
+decoder_inputs = tf.keras.layers.Input(shape=(None,))
+decoder_embedding = tf.keras.layers.Embedding(vocab_size, 256)(decoder_inputs)
+decoder_lstm = tf.keras.layers.LSTM(512, return_sequences=True, return_state=True)
+decoder_outputs, _, _= decoder_lstm(decoder_embedding,
+                                     initial_state=encoder_states)
+decoder_dense = tf.keras.layers.Dense(vocab_size,
+                                      activation='softmax')
+decoder_outputs= decoder_dense(decoder_outputs)
+
+model= tf.keras.models.Model([encoder_inputs,
+                              decoder_inputs],
+                             decoder_outputs)
+
+model.compile(optimizer='rmsprop',
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
+
+model.summary()
+
+# Training the model
+model.fit([questions_seq,
+           answers_seq[:,:-1]],
+          answers_seq[:,1:],
+          batch_size=64,
+          epochs=20,
+          validation_split=0.2)
+
+model.save('models/chatbot_model.h5')
+
+## Natural Language Processing Module
+
+This module is responsible for processing the user input and generating the chatbot output using natural language processing techniques.
+
+### Data
+
+The data used for this module consists of two text files: `questions.txt` and `answers.txt`. Each file contains one sentence per line that corresponds to a question or an answer related to coding and AI development. The sentences are paired across files by line number.
+
+The data was obtained from various online sources such as Stack Overflow and Quora. The data was cleaned and preprocessed by removing punctuation marks and converting all letters to lowercase.
+
+### Model
+
+The model used for this module is an encoder-decoder neural network with LSTM layers. The encoder takes the user input as a sequence of words and encodes it into a hidden state vector. The decoder takes the hidden state vector as an initial state and generates a sequence of words as the chatbot output.
+
+The model was implemented using TensorFlow and Keras libraries. The model was trained on 80%
+
+
